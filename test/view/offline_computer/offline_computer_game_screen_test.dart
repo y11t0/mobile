@@ -2093,6 +2093,64 @@ void main() {
       final gameState = ref.read(offlineComputerGameControllerProvider);
       expect(gameState.game.practiceMode, isTrue);
     });
+
+    testWidgets('a saved practice mode is not carried over to crazyhouse', (tester) async {
+      // Practice mode saved on in a standard game, then crazyhouse picked: the sheet that opens next
+      // must not bring practice mode back, and the preference stays on for the next standard game.
+      fakeEngine = LegalMoveEngine();
+
+      final gameStorage = MockOfflineComputerGameStorage();
+      when(() => gameStorage.fetchGame()).thenAnswer((_) async => null);
+      when(() => gameStorage.save(any())).thenAnswer((_) async {});
+
+      final app = await makeTestProviderScopeApp(
+        tester,
+        home: const OfflineComputerGameScreen(),
+        defaultPreferences: {
+          PrefCategory.offlineComputerGame.storageKey: jsonEncode(
+            OfflineComputerGamePrefs.defaults
+                .copyWith(
+                  practiceMode: true,
+                  variant: Variant.crazyhouse,
+                  timeIncrement: const TimeIncrement(300, 3),
+                )
+                .toJson(),
+          ),
+        },
+        overrides: {
+          offlineComputerGameStorageProvider: offlineComputerGameStorageProvider.overrideWith(
+            (_) => gameStorage,
+          ),
+        },
+      );
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      final practiceSwitch = find.descendant(
+        of: find.ancestor(of: find.text('Practice mode'), matching: find.byType(SwitchSettingTile)),
+        matching: find.byType(Switch),
+      );
+      await tester.ensureVisible(find.text('Practice mode'));
+      expect(tester.widget<Switch>(practiceSwitch).value, isFalse);
+      expect(timeControlTile(tester).enabled, true);
+      expect(timeControlTile(tester).settingsValue, 'Clock');
+
+      await selectSide(tester, Side.white);
+      await tester.ensureVisible(find.text('Play'));
+      await tester.tap(find.text('Play'));
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(OfflineComputerGameScreen)),
+      );
+      final game = container.read(offlineComputerGameControllerProvider).game;
+      expect(game.meta.variant, Variant.crazyhouse);
+      expect(game.practiceMode, isFalse);
+      expect(find.text('Play against computer'), findsOneWidget);
+      expect(find.text('Practice with computer'), findsNothing);
+      expect(container.read(offlineComputerGamePreferencesProvider).practiceMode, isTrue);
+    });
+
     testWidgets('a move outside the analysed lines is judged on its own analysis', (tester) async {
       // The slow path. The analysis running while the player thinks holds two lines, and e4 is not
       // one of the two the fake engine offers — so the position the move led to has no eval yet and

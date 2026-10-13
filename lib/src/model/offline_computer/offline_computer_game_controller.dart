@@ -254,14 +254,18 @@ class OfflineComputerGameController() extends Notifier<OfflineComputerGameState>
     TimeIncrement timeIncrement = const TimeIncrement.infinite(),
   }) {
     _analyser.clear();
+    // Crazyhouse is not played in practice mode, whatever the caller asked for.
+    final effectivePracticeMode = practiceMode && variant != Variant.crazyhouse;
     // Practice mode has no clock: thinking about the feedback it gives is the point of it, and a
     // move there waits on an evaluation the player did not ask for.
-    final effectiveTimeIncrement = practiceMode ? const TimeIncrement.infinite() : timeIncrement;
+    final effectiveTimeIncrement = effectivePracticeMode
+        ? const TimeIncrement.infinite()
+        : timeIncrement;
     state = OfflineComputerGameState.initial(
       opponentSpec: opponentSpec,
       playerSide: playerSide,
       casual: casual,
-      practiceMode: practiceMode,
+      practiceMode: effectivePracticeMode,
       variant: variant,
       initialFen: initialFen,
       timeIncrement: effectiveTimeIncrement,
@@ -270,7 +274,7 @@ class OfflineComputerGameController() extends Notifier<OfflineComputerGameState>
 
     if (state.turn != playerSide) {
       _playEngineMove();
-    } else if (casual || practiceMode) {
+    } else if (casual || effectivePracticeMode) {
       _analyseCurrentPosition();
     }
   }
