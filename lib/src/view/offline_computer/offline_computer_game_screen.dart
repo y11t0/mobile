@@ -764,7 +764,9 @@ class _NewGameSheetState() extends ConsumerState<_NewGameSheet> {
       _checkMaiaWeights(rating);
     }
     _casual = prefs.casual;
-    _practiceMode = prefs.practiceMode;
+    // Crazyhouse has no practice mode. The preference itself is left alone, so that it is still
+    // there for the other variants.
+    _practiceMode = prefs.practiceMode && _selectedVariant != Variant.crazyhouse;
     // Practice mode is played without a clock, so a game that starts in it starts untimed whatever
     // the last one was played with.
     _timeIncrement = _practiceMode ? const TimeIncrement.infinite() : prefs.timeIncrement;

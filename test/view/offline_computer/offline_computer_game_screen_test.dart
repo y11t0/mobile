@@ -2093,6 +2093,63 @@ void main() {
       final gameState = ref.read(offlineComputerGameControllerProvider);
       expect(gameState.game.practiceMode, isTrue);
     });
+    testWidgets('crazyhouse never starts in practice mode, but the preference is kept', (
+      tester,
+    ) async {
+      fakeEngine = LegalMoveEngine();
+
+      late WidgetRef ref;
+      final gameStorage = MockOfflineComputerGameStorage();
+      when(() => gameStorage.fetchGame()).thenAnswer((_) async => null);
+      when(() => gameStorage.save(any())).thenAnswer((_) async {});
+
+      final app = await makeTestProviderScopeApp(
+        tester,
+        home: Consumer(
+          builder: (context, r, _) {
+            ref = r;
+            return const OfflineComputerGameScreen();
+          },
+        ),
+        defaultPreferences: {
+          PrefCategory.offlineComputerGame.storageKey: jsonEncode(
+            OfflineComputerGamePrefs.defaults
+                .copyWith(variant: Variant.crazyhouse, practiceMode: true)
+                .toJson(),
+          ),
+        },
+        overrides: {
+          offlineComputerGameStorageProvider: offlineComputerGameStorageProvider.overrideWith(
+            (_) => gameStorage,
+          ),
+        },
+      );
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+
+      final practiceSwitch = find.descendant(
+        of: find.ancestor(of: find.text('Practice mode'), matching: find.byType(SwitchSettingTile)),
+        matching: find.byType(Switch),
+      );
+      await tester.ensureVisible(find.text('Practice mode'));
+      expect(tester.widget<Switch>(practiceSwitch).value, isFalse);
+      expect(timeControlTile(tester).enabled, isTrue);
+
+      await selectSide(tester, Side.white);
+      await tester.ensureVisible(find.text('Play'));
+      await tester.tap(find.text('Play'));
+      await tester.pumpAndSettle();
+
+      final gameState = ref.read(offlineComputerGameControllerProvider);
+      expect(gameState.game.meta.variant, Variant.crazyhouse);
+      expect(gameState.game.practiceMode, isFalse);
+      expect(find.text('Play against computer'), findsOneWidget);
+      expect(find.text('Practice with computer'), findsNothing);
+
+      // The preference the player has for the other variants is still there.
+      expect(ref.read(offlineComputerGamePreferencesProvider).practiceMode, isTrue);
+    });
+
     testWidgets('a move outside the analysed lines is judged on its own analysis', (tester) async {
       // The slow path. The analysis running while the player thinks holds two lines, and e4 is not
       // one of the two the fake engine offers — so the position the move led to has no eval yet and
